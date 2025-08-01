@@ -1,5 +1,6 @@
 package com.auth.service.exception;
 
+import com.auth.service.dto.ApplicationResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -94,4 +96,20 @@ public class GlobalExceptionHandler {
         response.put("details", ex.getMessage());
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
+
+
+
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<ApplicationResponse<String>> handleIOException(IOException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                ApplicationResponse.<String>builder()
+                        .statusCode(500)
+                        .message("IMAGE_UPLOAD_FAILED")
+                        .payload(ex.getMessage())
+                        .build()
+        );
+    }
+
+
+
 }

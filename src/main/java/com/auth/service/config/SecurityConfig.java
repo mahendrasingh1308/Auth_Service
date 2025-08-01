@@ -2,7 +2,6 @@ package com.auth.service.config;
 
 import com.auth.service.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -19,25 +18,20 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Autowired
-    private  JwtAuthenticationFilter jwtAuthFilter;
-    @Autowired
-    private  CustomUserDetailsService userDetailsService;
-    @Autowired
-    private  OAuth2SuccessHandler oAuth2SuccessHandler;
-
+    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final CustomUserDetailsService userDetailsService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService); // Your custom service
-        provider.setPasswordEncoder(new BCryptPasswordEncoder());
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
 
@@ -46,7 +40,13 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(
+                                "/api/auth/otpless/callback",
+                                "/api/auth/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
@@ -59,5 +59,4 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
-
 }

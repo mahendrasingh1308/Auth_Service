@@ -31,6 +31,8 @@ dependencies {
 
 // ------   Postgrees Db
     implementation 'org.postgresql:postgresql:42.7.2'
+    implementation 'org.hibernate.validator:hibernate-validator:8.0.1.Final'
+
 
 
     implementation 'org.projectlombok:lombok'
@@ -54,10 +56,9 @@ dependencies {
     // Auth2  ---> Login With Google
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
-
-
-
 }
+
+
 
 dependencyManagement {
     imports {

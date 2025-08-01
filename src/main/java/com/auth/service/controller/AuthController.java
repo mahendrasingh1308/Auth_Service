@@ -1,36 +1,27 @@
 package com.auth.service.controller;
 
 import com.auth.service.dto.*;
+import com.auth.service.entity.UserCredential;
+import com.auth.service.jwt.JwtUtil;
 import com.auth.service.service.AuthService;
+import com.auth.service.service.OtplessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import static com.auth.service.util.AppConstants.*;
 
-/**
- * REST controller for handling authentication-related operations like
- * signup, login, token refresh, and profile retrieval.
- * <p>
- * Exposes endpoints under the base URL path <code>/api/auth</code>.
- * </p>
- *
- * @author Mahendra
- * @since 2025
- */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
+    private final OtplessService otplessService;
     private final AuthService authService;
+    private final JwtUtil jwtUtil;
 
     /**
-     * Endpoint for registering a new user.
-     *
-     * @param request Signup request DTO containing name, email, and password
-     * @return {@link ApplicationResponse} with success message and payload
+     * Register a new user.
      */
     @PostMapping("/signup")
     public ResponseEntity<ApplicationResponse<SignupResponse>> signup(@RequestBody SignupRequest request) {
@@ -39,16 +30,13 @@ public class AuthController {
                 ApplicationResponse.<SignupResponse>builder()
                         .statusCode(200)
                         .payload(response)
-                        .message(USER_REGISTERED_SUCCESSFULLY)
+                        .message(response.getMessage())
                         .build()
         );
     }
 
     /**
-     * Endpoint to authenticate user and return JWT access and refresh tokens.
-     *
-     * @param request Login request DTO with email and password
-     * @return {@link ApplicationResponse} with token payload
+     * Login endpoint - returns access & refresh tokens.
      */
     @PostMapping("/login")
     public ResponseEntity<ApplicationResponse<JwtResponse>> login(@RequestBody LoginRequest request) {
@@ -57,16 +45,13 @@ public class AuthController {
                 ApplicationResponse.<JwtResponse>builder()
                         .statusCode(200)
                         .payload(response)
-                        .message(USER_LOGEDIN_SUCCESSFULLTY)
+                        .message(USER_LOGGED_IN_SUCCESSFULLY)
                         .build()
         );
     }
 
     /**
-     * Endpoint to generate a new access token using a valid refresh token.
-     *
-     * @param request Refresh token DTO
-     * @return {@link ApplicationResponse} with new access token
+     * Refresh access token using refresh token.
      */
     @PostMapping("/refresh")
     public ResponseEntity<ApplicationResponse<JwtResponse>> refreshToken(@RequestBody TokenRefreshRequest request) {
@@ -81,18 +66,40 @@ public class AuthController {
     }
 
     /**
-     * Endpoint to retrieve currently logged-in user's profile info.
-     *
-     * @param authentication Spring Security's authentication object (auto injected)
-     * @return {@link ApplicationResponse} containing user's email
+     * OTPLESS login or registration endpoint
      */
-    @GetMapping("/profile")
-    public ResponseEntity<ApplicationResponse<String>> getUserProfile(Authentication authentication) {
+    @PostMapping("/otpless/callback")
+    public ResponseEntity<ApplicationResponse<JwtResponse>> otplessCallback(@RequestParam("token") String token) {
+        OtplessUser otplessUser = otplessService.verifyOtplessToken(token);
+
+        // Register or login user
+        UserCredential userCredential = authService.registerOrLoginWithOtpless(otplessUser);
+
+        // Generate tokens
+        String accessToken = jwtUtil.generateAccessToken(userCredential);
+        String refreshToken = jwtUtil.generateRefreshToken(userCredential);
+
+        JwtResponse jwtResponse = new JwtResponse(accessToken, refreshToken, userCredential.getUuid());
+
+        return ResponseEntity.ok(
+                ApplicationResponse.<JwtResponse>builder()
+                        .statusCode(200)
+                        .payload(jwtResponse)
+                        .message(OTPLESS_LOGIN_SUCCESS)
+                        .build()
+        );
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApplicationResponse<String>> logout(@RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.replace("Bearer ", "");
+        String message = authService.logout(token);
+
         return ResponseEntity.ok(
                 ApplicationResponse.<String>builder()
                         .statusCode(200)
-                        .payload(authentication.getName())
-                        .message(PROFILE_ACCESS_GRANTED)
+                        .message(message)
+                        .payload(message)
                         .build()
         );
     }

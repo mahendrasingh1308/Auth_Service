@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ApplicationResponse<T> {
     private int statusCode;
-    private T payload;
     private String message;
+    private T payload;
 }

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Otpless Headless Login</title>
+
+    <!-- ✅ Step 1: Include Headless SDK -->
+    <script
+            id="otpless-sdk"
+            src="https://otpless.com/v4/headless.js"
+            data-appid="KY7Y1GDXDZ1XK4A3242F">
+    </script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        input {
+            margin: 5px;
+            padding: 8px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>🔐 Login with OTPLESS (Headless)</h2>
+
+<!-- ✅ Step 3: Custom UI -->
+<div>
+    <input id="mobile-input" placeholder="📱 Enter mobile number" />
+    <button onclick="phoneAuth()">Request OTP</button>
+</div>
+
+<div id="otp-section" style="display: none;">
+    <input id="otp-input" placeholder="🔑 Enter OTP" />
+    <button onclick="verifyOTP()">Verify OTP</button>
+</div>
+
+<button onclick="oauth('WHATSAPP')">Continue with WhatsApp</button>
+<button onclick="oauth('EMAIL')">Continue with Email</button>
+
+<!-- ✅ Step 2: JS Callback & Functions -->
+<script>
+    const callback = (eventCallback) => {
+        const ONETAP = () => {
+            const token = eventCallback.response.token;
+            console.log("✅ Success:", token);
+            alert("Token:\n" + token);
+        };
+
+        const OTP_AUTO_READ = () => {
+            const otp = eventCallback.response.otp;
+            console.log("🔁 Auto-read OTP:", otp);
+        };
+
+        const FAILED = () => {
+            console.log("❌ Failed:", eventCallback.response);
+        };
+
+        const FALLBACK_TRIGGERED = () => {
+            console.log("🔃 Fallback:", eventCallback.response);
+        };
+
+        const EVENTS_MAP = {
+            ONETAP,
+            OTP_AUTO_READ,
+            FAILED,
+            FALLBACK_TRIGGERED
+        };
+
+        if ("responseType" in eventCallback)
+            EVENTS_MAP[eventCallback.responseType]();
+    };
+
+    // ✅ SDK Initialize
+    const OTPlessSignin = new OTPless(callback);
+
+    const phoneAuth = () => {
+        const phone = document.getElementById("mobile-input").value;
+        OTPlessSignin.initiate({
+            channel: "PHONE",
+            phone: phone,
+            countryCode: "+91"
+        });
+        document.getElementById("otp-section").style.display = "block";
+    };
+
+    const verifyOTP = () => {
+        const phone = document.getElementById("mobile-input").value;
+        const otp = document.getElementById("otp-input").value;
+        OTPlessSignin.verify({
+            channel: "PHONE",
+            phone: phone,
+            otp: otp,
+            countryCode: "+91"
+        });
+    };
+
+    const oauth = (method) => {
+        OTPlessSignin.initiate({
+            channel: "OAUTH",
+            channelType: method
+        });
+    };
+</script>
+</body>
+</html>
