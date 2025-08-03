@@ -2,6 +2,7 @@ package com.auth.service.service;
 
 import com.auth.service.dto.OtplessUser;
 import com.auth.service.exception.CustomException;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -14,8 +15,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 
+/**
+ * Service for verifying OTPless token.
+ */
 @Service
 @RequiredArgsConstructor
+@Hidden // This hides the class from Swagger/OpenAPI docs
 public class OtplessService {
 
     @Value("${otpless.client-id}")
@@ -26,6 +31,7 @@ public class OtplessService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    // DO NOT DOCUMENT THIS - Commented code
 //    public OtplessUser verifyOtplessToken(String token) {
 //        try {
 //            // Step 1: Encode credentials
@@ -74,18 +80,20 @@ public class OtplessService {
 //        }
 //    }
 
+    /**
+     * This is a mock method for testing OTPless login functionality.
+     * This will NOT be shown in API documentation.
+     */
     public OtplessUser verifyOtplessToken(String token) {
-        if (token.equals("demo123")) {
+        if (token.equals("demo1234")) {
             OtplessUser user = new OtplessUser();
-            user.setEmail("demo@otpless.com");
-            user.setPhone("9999999999");
+            user.setEmail("abc@otpless.com");
+            user.setPhone("6666666666");
             user.setChannel("whatsapp");
             return user;
         }
 
         throw new CustomException("Invalid demo token.");
     }
-
-
 
 }

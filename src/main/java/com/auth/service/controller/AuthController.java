@@ -11,6 +11,17 @@ import org.springframework.web.bind.annotation.*;
 
 import static com.auth.service.util.AppConstants.*;
 
+/**
+ * REST controller for handling authentication operations.
+ * <p>
+ * Exposes endpoints for:
+ * - User signup
+ * - User login
+ * - Token refresh
+ * - Otpless login (via WhatsApp)
+ * - Logout
+ * </p>
+ */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -21,7 +32,10 @@ public class AuthController {
     private final JwtUtil jwtUtil;
 
     /**
-     * Register a new user.
+     * Registers a new user with provided credentials.
+     *
+     * @param request the signup request containing user details
+     * @return response containing user info and success message
      */
     @PostMapping("/signup")
     public ResponseEntity<ApplicationResponse<SignupResponse>> signup(@RequestBody SignupRequest request) {
@@ -36,7 +50,10 @@ public class AuthController {
     }
 
     /**
-     * Login endpoint - returns access & refresh tokens.
+     * Authenticates a user and returns access and refresh JWT tokens.
+     *
+     * @param request the login request containing credentials
+     * @return response with generated tokens and user information
      */
     @PostMapping("/login")
     public ResponseEntity<ApplicationResponse<JwtResponse>> login(@RequestBody LoginRequest request) {
@@ -51,7 +68,10 @@ public class AuthController {
     }
 
     /**
-     * Refresh access token using refresh token.
+     * Generates a new access token using a valid refresh token.
+     *
+     * @param request the token refresh request containing refresh token
+     * @return response with new access and refresh tokens
      */
     @PostMapping("/refresh")
     public ResponseEntity<ApplicationResponse<JwtResponse>> refreshToken(@RequestBody TokenRefreshRequest request) {
@@ -66,16 +86,18 @@ public class AuthController {
     }
 
     /**
-     * OTPLESS login or registration endpoint
+     * Handles OTP-less login or registration via Otpless integration.
+     * Accepts token received via Otpless redirect and returns JWT tokens.
+     *
+     * @param token the Otpless identity token
+     * @return response with tokens for the authenticated user
      */
     @PostMapping("/otpless/callback")
     public ResponseEntity<ApplicationResponse<JwtResponse>> otplessCallback(@RequestParam("token") String token) {
         OtplessUser otplessUser = otplessService.verifyOtplessToken(token);
 
-        // Register or login user
         UserCredential userCredential = authService.registerOrLoginWithOtpless(otplessUser);
 
-        // Generate tokens
         String accessToken = jwtUtil.generateAccessToken(userCredential);
         String refreshToken = jwtUtil.generateRefreshToken(userCredential);
 
@@ -90,6 +112,12 @@ public class AuthController {
         );
     }
 
+    /**
+     * Logs out the user by invalidating the access token.
+     *
+     * @param authHeader the Authorization header containing the Bearer token
+     * @return response confirming logout
+     */
     @PostMapping("/logout")
     public ResponseEntity<ApplicationResponse<String>> logout(@RequestHeader("Authorization") String authHeader) {
         String token = authHeader.replace("Bearer ", "");
@@ -104,3 +132,8 @@ public class AuthController {
         );
     }
 }
+
+
+
+
+

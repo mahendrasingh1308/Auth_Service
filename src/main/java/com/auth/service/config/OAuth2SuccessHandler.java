@@ -18,6 +18,16 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Handles successful OAuth2 authentication.
+ * <p>
+ * This handler:
+ * - Extracts user info from OAuth2 provider (e.g., Google)
+ * - Registers new users if they don't exist
+ * - Generates JWT access token
+ * - Redirects user with token as URL parameter
+ * </p>
+ */
 @Component
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
@@ -25,6 +35,17 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final UserCredentialRepository userCredentialRepository;
     private final JwtUtil jwtUtil;
 
+    /**
+     * Processes the successful OAuth2 login.
+     * If the user does not exist, registers them with default role USER.
+     * Generates an access token and redirects with it in the URL.
+     *
+     * @param request        the HTTP request
+     * @param response       the HTTP response
+     * @param authentication the authenticated principal (OAuth2User)
+     * @throws IOException      if redirect fails
+     * @throws ServletException if servlet error occurs
+     */
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
@@ -39,21 +60,18 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         if (optionalUser.isEmpty()) {
             user = UserCredential.builder()
-                    .uuid(UUID.randomUUID().toString()) // ✅ UUID required for token subject
+                    .uuid(UUID.randomUUID().toString())
                     .email(email)
                     .role(Role.USER)
-                    .loginChannel(LoginChannel.GOOGLE) // or whatever provider you're using
-                    .password(null) // Google login so no password
+                    .loginChannel(LoginChannel.GOOGLE)
+                    .password(null)
                     .build();
             userCredentialRepository.save(user);
         } else {
             user = optionalUser.get();
         }
 
-        // ✅ Use UserCredential for token generation
         String token = jwtUtil.generateAccessToken(user);
-
-        // ✅ Redirect with token (can also use cookie)
         response.sendRedirect("http://localhost:8081/swagger-ui/index.html?token=" + token);
     }
 }

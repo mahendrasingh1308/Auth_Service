@@ -14,6 +14,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Spring Security configuration class for setting up authentication and authorization.
+ * <p>
+ * Includes:
+ * - JWT filter
+ * - OAuth2 login success handling
+ * - Stateless session policy
+ * - Swagger & auth endpoints whitelisting
+ * </p>
+ */
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
@@ -22,11 +32,21 @@ public class SecurityConfig {
     private final CustomUserDetailsService userDetailsService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
+    /**
+     * Bean for encoding passwords using BCrypt hashing algorithm.
+     *
+     * @return password encoder instance
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Bean that provides custom authentication logic using DaoAuthenticationProvider.
+     *
+     * @return configured authentication provider
+     */
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
@@ -35,6 +55,18 @@ public class SecurityConfig {
         return provider;
     }
 
+    /**
+     * Configures the main Spring Security filter chain for the application.
+     * - Disables CSRF
+     * - Sets endpoint permissions (e.g., allows public access to auth and swagger)
+     * - Configures OAuth2 login with custom success handler
+     * - Registers JWT authentication filter
+     * - Enforces stateless sessions
+     *
+     * @param http the HttpSecurity object
+     * @return the configured SecurityFilterChain
+     * @throws Exception if configuration fails
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
