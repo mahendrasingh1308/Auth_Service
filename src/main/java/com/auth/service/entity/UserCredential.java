@@ -28,44 +28,44 @@ public class UserCredential {
     /**
      * Unique user identifier used for communication across services.
      */
-    @Column(nullable = false, unique = true, updatable = false)
+    @Column(name="uuid",nullable = false, unique = true, updatable = false)
     private String uuid;
+
+
+
+    /**
+     * User's first name
+     */
+    @Column(name="first_name",nullable = true)
+    private String firstName;
+
+    /**
+     * User's last name
+     */
+    @Column(name="last_name",nullable = true)
+    private String lastName;
+
+
+
 
     /**
      * User's email address. Must be unique.
      */
-    @Column(unique = true)
+    @Column(name="email",unique = true)
     private String email;
 
     /**
      * User's phone number. Must be unique.
      */
-    @Column(unique = true)
+    @Column(name="phone",unique = true)
     private String phone;
 
     /**
      * Encrypted password for email-based login. Nullable for social/Otpless logins.
      */
-    @Column(nullable = true)
+    @Column(name="password",nullable = true)
     private String password;
 
-    /**
-     * User's first name (optional).
-     */
-    @Column(nullable = true)
-    private String firstName;
-
-    /**
-     * User's last name (optional).
-     */
-    @Column(nullable = true)
-    private String lastName;
-
-    /**
-     * Unique username for the user. Can be system or user generated.
-     */
-    @Column(unique = true)
-    private String username;
 
     /**
      * Role assigned to the user (e.g., USER, CREATOR, ADMIN).

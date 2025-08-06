@@ -18,6 +18,9 @@ public enum LoginChannel {
     /** OTP-less login via WhatsApp */
     WHATSAPP,
 
+    /** Login via Facebook OAuth */
+    FACEBOOK,
+
     /** OTP-less login via SMS */
     SMS,
 

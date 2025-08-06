@@ -19,8 +19,13 @@ import static com.auth.service.util.AppConstants.*;
 
 /**
  * Implementation of the AuthService interface.
- * Handles authentication logic such as signup, login, token refresh,
- * OTP-less login, and logout.
+ * <p>
+ * Handles all core authentication logic including:
+ * - User signup
+ * - Login with email/password
+ * - Refresh token generation
+ * - OTP-less login (e.g., WhatsApp/SMS)
+ * - Logout
  */
 @Service
 @RequiredArgsConstructor
@@ -31,11 +36,12 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
 
     /**
-     * Registers a new user if the email is not already taken.
-     * Also generates a unique username.
+     * Registers a new user with the provided signup details.
+     * Ensures email uniqueness, validates role and login channel,
+     * and saves the user to the database.
      *
-     * @param request Signup request data
-     * @return Signup response with a success message
+     * @param request the user signup request data
+     * @return a response message indicating successful registration
      */
     @Override
     public SignupResponse signup(SignupRequest request) {
@@ -57,8 +63,6 @@ public class AuthServiceImpl implements AuthService {
             throw new CustomException("Invalid login channel: " + request.getLoginChannel());
         }
 
-        String username = generateUniqueUsername(request.getFirstName(), request.getLastName());
-
         UserCredential user = UserCredential.builder()
                 .uuid(UUID.randomUUID().toString())
                 .email(request.getEmail())
@@ -66,7 +70,6 @@ public class AuthServiceImpl implements AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(roleEnum)
                 .loginChannel(loginChannel)
-                .username(username)
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .build();
@@ -83,11 +86,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * Authenticates a user by validating their email and password.
-     * If valid, generates JWT access and refresh tokens.
+     * Authenticates a user using email and password.
+     * On success, returns a pair of JWT access and refresh tokens.
      *
-     * @param request Login credentials
-     * @return JWT response with tokens and UUID
+     * @param request the login request containing email and password
+     * @return JWT tokens and user UUID
      */
     @Override
     public JwtResponse login(LoginRequest request) {
@@ -105,10 +108,10 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * Generates a new access token using a valid refresh token.
+     * Refreshes the access token using a valid, non-expired refresh token.
      *
      * @param request contains the refresh token
-     * @return JWT response with new access token
+     * @return new access token along with the original refresh token and user UUID
      */
     @Override
     public JwtResponse refreshToken(TokenRefreshRequest request) {
@@ -126,11 +129,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * Registers or logs in a user using OTP-less mechanism (e.g., WhatsApp, SMS).
-     * If user doesn't exist, creates a new one.
+     * Registers or logs in a user using OTP-less authentication methods
+     * such as WhatsApp or SMS. If the user does not exist, a new user is created.
      *
-     * @param otplessUser user data from OTP-less provider
-     * @return the UserCredential object
+     * @param otplessUser the user information from the OTP-less provider
+     * @return the authenticated or newly registered user
      */
     @Override
     public UserCredential registerOrLoginWithOtpless(OtplessUser otplessUser) {
@@ -139,77 +142,36 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Optional<UserCredential> optional = userRepository.findByPhone(otplessUser.getPhone());
-        UserCredential user;
 
         if (optional.isPresent()) {
-            user = optional.get();
-        } else {
-            LoginChannel loginChannel;
-            try {
-                loginChannel = LoginChannel.valueOf(otplessUser.getChannel().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new CustomException("Invalid login channel: " + otplessUser.getChannel());
-            }
-
-            String baseName = otplessUser.getEmail() != null
-                    ? otplessUser.getEmail().split("@")[0]
-                    : "user";
-
-            String username = generateUniqueUsername(baseName);
-
-            user = UserCredential.builder()
-                    .uuid(UUID.randomUUID().toString())
-                    .email(otplessUser.getEmail())
-                    .phone(otplessUser.getPhone())
-                    .role(Role.USER)
-                    .loginChannel(loginChannel)
-                    .username(username)
-                    .build();
-
-            userRepository.save(user);
+            return optional.get();
         }
 
+        LoginChannel loginChannel;
+        try {
+            loginChannel = LoginChannel.valueOf(otplessUser.getChannel().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new CustomException("Invalid login channel: " + otplessUser.getChannel());
+        }
+
+        UserCredential user = UserCredential.builder()
+                .uuid(UUID.randomUUID().toString())
+                .email(otplessUser.getEmail())
+                .phone(otplessUser.getPhone())
+                .role(Role.USER)
+                .loginChannel(loginChannel)
+                .build();
+
+        userRepository.save(user);
         return user;
     }
 
     /**
-     * Generates a unique username using first and last name.
-     * Falls back to adding a random 4-digit suffix until uniqueness is achieved.
+     * Logs out a user by decoding their token and returning
+     * a role-specific logout message.
      *
-     * @param firstName user's first name
-     * @param lastName user's last name
-     * @return a unique username string
-     */
-    private String generateUniqueUsername(String firstName, String lastName) {
-        String base = (firstName + lastName).toLowerCase().replaceAll("\\s+", "");
-        return generateUniqueUsername(base);
-    }
-
-    /**
-     * Tries multiple times to generate a unique username from base.
-     *
-     * @param base base username string
-     * @return unique username
-     */
-    private String generateUniqueUsername(String base) {
-        String username;
-        int attempt = 0;
-        do {
-            int randNum = 1000 + (int)(Math.random() * 9000);
-            username = base + randNum;
-            attempt++;
-            if (attempt > 10_000) {
-                throw new CustomException("Could not generate unique username");
-            }
-        } while (userRepository.existsByUsername(username));
-        return username;
-    }
-
-    /**
-     * Logs out a user based on their token and returns a role-based message.
-     *
-     * @param token JWT token from the request
-     * @return logout success message
+     * @param token the JWT token to extract the user identity from
+     * @return a logout confirmation message
      */
     @Override
     public String logout(String token) {

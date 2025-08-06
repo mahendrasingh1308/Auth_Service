@@ -9,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -19,14 +20,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Handles successful OAuth2 authentication.
- * <p>
- * This handler:
- * - Extracts user info from OAuth2 provider (e.g., Google)
- * - Registers new users if they don't exist
- * - Generates JWT access token
- * - Redirects user with token as URL parameter
- * </p>
+ * Handles successful OAuth2 login from Google and Facebook.
+ * Registers user if not present, issues JWT, and redirects with token.
  */
 @Component
 @RequiredArgsConstructor
@@ -35,25 +30,27 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final UserCredentialRepository userCredentialRepository;
     private final JwtUtil jwtUtil;
 
-    /**
-     * Processes the successful OAuth2 login.
-     * If the user does not exist, registers them with default role USER.
-     * Generates an access token and redirects with it in the URL.
-     *
-     * @param request        the HTTP request
-     * @param response       the HTTP response
-     * @param authentication the authenticated principal (OAuth2User)
-     * @throws IOException      if redirect fails
-     * @throws ServletException if servlet error occurs
-     */
+    @Value("${app.frontend.redirect-url}")
+    private String frontendRedirectUrl;
+
+
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
 
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
+
         String email = oAuth2User.getAttribute("email");
         String name = oAuth2User.getAttribute("name");
+
+
+        if (email == null) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Email not provided by OAuth2 provider.");
+            return;
+        }
+
+        LoginChannel loginChannel = extractLoginChannelFromRequest(request);
 
         Optional<UserCredential> optionalUser = userCredentialRepository.findByEmail(email);
         UserCredential user;
@@ -63,15 +60,30 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                     .uuid(UUID.randomUUID().toString())
                     .email(email)
                     .role(Role.USER)
-                    .loginChannel(LoginChannel.GOOGLE)
+                    .loginChannel(loginChannel)
                     .password(null)
                     .build();
+
             userCredentialRepository.save(user);
         } else {
             user = optionalUser.get();
         }
 
         String token = jwtUtil.generateAccessToken(user);
-        response.sendRedirect("http://localhost:8081/swagger-ui/index.html?token=" + token);
+
+        // TODO: Use a configurable frontend URL (instead of hardcoded Swagger UI)
+           response.sendRedirect(frontendRedirectUrl + "?token=" + token);
+
     }
+
+    /**
+     * Determine login channel (GOOGLE / FACEBOOK) from request URI
+     */
+    private LoginChannel extractLoginChannelFromRequest(HttpServletRequest request) {
+        String uri = request.getRequestURI().toLowerCase();
+        if (uri.contains("facebook")) return LoginChannel.FACEBOOK;
+        if (uri.contains("google")) return LoginChannel.GOOGLE;
+        return LoginChannel.EMAIL;
+    }
+
 }
