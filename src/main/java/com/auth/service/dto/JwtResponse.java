@@ -29,4 +29,7 @@ public class JwtResponse {
      * Unique identifier (UUID) of the authenticated user.
      */
     private String uuid;
+
+    private String message;
+
 }

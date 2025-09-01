@@ -1,19 +1,34 @@
 package com.auth.service.util;
 
+/**
+ * Application-wide constants for messages and statuses.
+ * Centralized here to avoid hardcoding strings in controllers/services.
+ */
 public class AppConstants {
 
-    public static final String USER_REGISTERED_SUCCESSFULLY = "User registered successfully!";
-    public static final String USER_LOGGED_IN_SUCCESSFULLY = "User logged in successfully!";
-    public static final String USER_ALREADY_EXISTS = "User already exists with this email!";
-    public static final String INVALID_EMAIL_PASSWPRD = "Invalid email or password";
-    public static final String REFERESH_TOKEN = "Refresh token expired. Please login again.";
-    public static final String TOKEN_REFERESED_SUCCESSFULLY = "Token refreshed successfully";
-    public static final String OTPLESS_LOGIN_SUCCESS = "Otpless login successful!";
-    public static final String CREATOR_REGISTERED_SUCCESSFULLY = "Creator registered successfully!";
-    public static final String ADMIN_REGISTERED_SUCCESSFULLY = "Admin registered successfully!";
-    public static final String USER_LOGGED_OUT_SUCCESSFULLY = "User logged out successfully!";
-    public static final String CREATOR_LOGGED_OUT_SUCCESSFULLY = "Creator logged out successfully!";
-    public static final String ADMIN_LOGGED_OUT_SUCCESSFULLY = "Admin logged out successfully!";
+    // Signup
+    public static final String SIGNUP_SUCCESS = "Signup successful";
+    public static final String EMAIL_ALREADY_EXISTS = "Email already exists";
+    public static final String USERNAME_ALREADY_EXISTS = "Username already exists";
+    public static final String PHONE_ALREADY_EXISTS = "Phone already exists";
+    public static final String MOBILE_ALREADY_EXISTS = "Mobile number already exists";
 
+    // Login
+    public static final String LOGIN_SUCCESS = "Login successful";
+    public static final String INVALID_CREDENTIALS = "Invalid credentials";
+    public static final String USER_NOT_FOUND = "User not found";
 
+    // Token
+    public static final String TOKEN_REFRESHED = "Token refreshed successfully";
+    public static final String INVALID_REFRESH_TOKEN = "Invalid refresh token";
+    public static final String REFRESH_TOKEN_MISSING = "Refresh token is missing";
+
+    // Logout
+    public static final String LOGOUT_SUCCESS = "Logout successful";
+    public static final String  AUTHORIZATION="Authorization";
+    public static final String  BEARER="Bearer";
+
+    private AppConstants() {
+        // prevent instantiation
+    }
 }

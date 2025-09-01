@@ -1,13 +1,15 @@
 package com.auth.service.config;
 
 import com.auth.service.jwt.JwtAuthenticationFilter;
+import com.auth.service.service.Impl.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,27 +17,22 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Spring Security configuration class for setting up authentication and authorization.
+ * Security configuration for the Auth Service.
  * <p>
- * Includes:
- * - JWT filter
- * - OAuth2 login success handling
- * - Stateless session policy
- * - Swagger & auth endpoints whitelisting
- * </p>
+ * Configures authentication & authorization using Spring Security.
+ * Uses {@link CustomUserDetailsService} for user details and
+ * {@link JwtAuthenticationFilter} for JWT-based authentication.
  */
 @Configuration
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthFilter;
-    private final CustomUserDetailsService userDetailsService;
-    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final CustomUserDetailsService customUserDetailsService;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     /**
-     * Bean for encoding passwords using BCrypt hashing algorithm.
-     *
-     * @return password encoder instance
+     * Provides a BCryptPasswordEncoder bean for password hashing.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -43,54 +40,51 @@ public class SecurityConfig {
     }
 
     /**
-     * Bean that provides custom authentication logic using DaoAuthenticationProvider.
-     *
-     * @return configured authentication provider
+     * Configures authentication provider with custom user details service
+     * and BCrypt password encoder.
      */
     @Bean
-    public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
-        provider.setPasswordEncoder(passwordEncoder());
-        return provider;
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(customUserDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
     }
 
     /**
-     * Configures the main Spring Security filter chain for the application.
-     * - Disables CSRF
-     * - Sets endpoint permissions (e.g., allows public access to auth and swagger)
-     * - Configures OAuth2 login with custom success handler
-     * - Registers JWT authentication filter
-     * - Enforces stateless sessions
-     *
-     * @param http the HttpSecurity object
-     * @return the configured SecurityFilterChain
-     * @throws Exception if configuration fails
+     * Exposes AuthenticationManager bean to be used in services.
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration authenticationConfiguration
+    ) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    /**
+     * Defines the main Spring Security filter chain:
+     * - CSRF disabled (stateless)
+     * - Public access for /api/auth/**
+     * - Role-based access for creator & fan APIs
+     * - Stateless session management
+     * - Adds JWT filter
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
-                .csrf(AbstractHttpConfigurer::disable)
+        http
+                .csrf(csrf -> csrf.disable())
+
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                        "/api/auth/otpless/callback",
-                                        "/api/auth/**",
-                                        "/swagger-ui/**",
-                                        "/swagger-ui.html",
-                                        "/v3/api-docs/**",
-                                        "/oauth2/**",
-                                        "/login/oauth2/**"
-                                ).permitAll()
-                                .anyRequest().authenticated()
+                        .requestMatchers("/api/auth/**","/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/creator/**").hasRole("CREATOR")
+                        .requestMatchers("/api/fan/**").hasRole("FAN")
+                        .anyRequest().authenticated()
                 )
-                .oauth2Login(oauth -> oauth
-                        .successHandler(oAuth2SuccessHandler)
-                )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
+
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
     }
 }

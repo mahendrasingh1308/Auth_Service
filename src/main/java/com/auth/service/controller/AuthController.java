@@ -1,139 +1,101 @@
 package com.auth.service.controller;
 
 import com.auth.service.dto.*;
-import com.auth.service.entity.UserCredential;
-import com.auth.service.jwt.JwtUtil;
 import com.auth.service.service.AuthService;
-import com.auth.service.service.OtplessService;
+import com.auth.service.util.AppConstants;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import static com.auth.service.util.AppConstants.*;
-
 /**
- * REST controller for handling authentication operations.
+ * Authentication Controller for handling user signup, login, refresh, and logout.
  * <p>
- * Exposes endpoints for:
- * - User signup
- * - User login
- * - Token refresh
- * - Otpless login (via WhatsApp)
- * - Logout
- * </p>
+ * Supports both Fan and Creator registration flows, JWT login/refresh, and secure logout.
  */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final OtplessService otplessService;
     private final AuthService authService;
-    private final JwtUtil jwtUtil;
 
     /**
-     * Registers a new user with provided credentials.
+     * Register a new Fan account.
      *
-     * @param request the signup request containing user details
-     * @return response containing user info and success message
+     * @param request request payload containing Fan signup details
+     * @return success response with Fan details
      */
-    @PostMapping("/signup")
-    public ResponseEntity<ApplicationResponse<SignupResponse>> signup(@RequestBody SignupRequest request) {
-        SignupResponse response = authService.signup(request);
+    @PostMapping("/fan/signup")
+    public ResponseEntity<ApplicationResponse<FanSignupResponse>> registerFan(@RequestBody FanSignupRequest request) {
+        FanSignupResponse response = authService.registerFan(request);
         return ResponseEntity.ok(
-                ApplicationResponse.<SignupResponse>builder()
-                        .statusCode(200)
-                        .payload(response)
-                        .message(response.getMessage())
-                        .build()
+                new ApplicationResponse<>(200, AppConstants.SIGNUP_SUCCESS, response)
         );
     }
 
     /**
-     * Authenticates a user and returns access and refresh JWT tokens.
+     * Register a new Creator account.
      *
-     * @param request the login request containing credentials
-     * @return response with generated tokens and user information
+     * @param request request payload containing Creator signup details
+     * @return success response with Creator details
+     */
+    @PostMapping("/creator/signup")
+    public ResponseEntity<ApplicationResponse<CreatorSignupResponse>> registerCreator(@RequestBody CreatorSignupRequest request) {
+        CreatorSignupResponse response = authService.registerCreator(request);
+        return ResponseEntity.ok(
+                new ApplicationResponse<>(200, AppConstants.SIGNUP_SUCCESS, response)
+        );
+    }
+
+    /**
+     * Login with email/username/phone and password.
+     *
+     * @param request login credentials
+     * @return JWT access and refresh tokens
      */
     @PostMapping("/login")
     public ResponseEntity<ApplicationResponse<JwtResponse>> login(@RequestBody LoginRequest request) {
-        JwtResponse response = authService.login(request);
+        JwtResponse jwtResponse = authService.login(request);
         return ResponseEntity.ok(
-                ApplicationResponse.<JwtResponse>builder()
-                        .statusCode(200)
-                        .payload(response)
-                        .message(USER_LOGGED_IN_SUCCESSFULLY)
-                        .build()
+                new ApplicationResponse<>(200, AppConstants.LOGIN_SUCCESS, jwtResponse)
         );
     }
 
     /**
-     * Generates a new access token using a valid refresh token.
+     * Refresh JWT tokens using a valid refresh token.
      *
-     * @param request the token refresh request containing refresh token
-     * @return response with new access and refresh tokens
+     * @param request contains refresh token
+     * @return new JWT access and refresh tokens
      */
     @PostMapping("/refresh")
     public ResponseEntity<ApplicationResponse<JwtResponse>> refreshToken(@RequestBody TokenRefreshRequest request) {
-        JwtResponse response = authService.refreshToken(request);
+        JwtResponse jwtResponse = authService.refreshToken(request);
         return ResponseEntity.ok(
-                ApplicationResponse.<JwtResponse>builder()
-                        .statusCode(200)
-                        .payload(response)
-                        .message(TOKEN_REFERESED_SUCCESSFULLY)
-                        .build()
+                new ApplicationResponse<>(200, AppConstants.TOKEN_REFRESHED, jwtResponse)
         );
     }
 
     /**
-     * Handles OTP-less login or registration via Otpless integration.
-     * Accepts token received via Otpless redirect and returns JWT tokens.
+     * Logout user by invalidating the refresh token.
+     * Refresh token must be provided in the Authorization header as "Bearer <token>".
      *
-     * @param token the Otpless identity token
-     * @return response with tokens for the authenticated user
-     */
-    @PostMapping("/otpless/callback")
-    public ResponseEntity<ApplicationResponse<JwtResponse>> otplessCallback(@RequestParam("token") String token) {
-        OtplessUser otplessUser = otplessService.verifyOtplessToken(token);
-
-        UserCredential userCredential = authService.registerOrLoginWithOtpless(otplessUser);
-
-        String accessToken = jwtUtil.generateAccessToken(userCredential);
-        String refreshToken = jwtUtil.generateRefreshToken(userCredential);
-
-        JwtResponse jwtResponse = new JwtResponse(accessToken, refreshToken, userCredential.getUuid());
-
-        return ResponseEntity.ok(
-                ApplicationResponse.<JwtResponse>builder()
-                        .statusCode(200)
-                        .payload(jwtResponse)
-                        .message(OTPLESS_LOGIN_SUCCESS)
-                        .build()
-        );
-    }
-
-    /**
-     * Logs out the user by invalidating the access token.
-     *
-     * @param authHeader the Authorization header containing the Bearer token
-     * @return response confirming logout
+     * @param request HTTP request containing Authorization header
+     * @return success message if logout is successful
      */
     @PostMapping("/logout")
-    public ResponseEntity<ApplicationResponse<String>> logout(@RequestHeader("Authorization") String authHeader) {
-        String token = authHeader.replace("Bearer ", "");
-        String message = authService.logout(token);
+    public ResponseEntity<ApplicationResponse<String>> logout(HttpServletRequest request) {
+        String header = request.getHeader(AppConstants.AUTHORIZATION);
+        if (header == null || !header.startsWith(AppConstants.BEARER)) {
+            return ResponseEntity.badRequest()
+                    .body(new ApplicationResponse<>(400, AppConstants.REFRESH_TOKEN_MISSING, null));
+        }
+
+        String refreshToken = header.substring(7);
+        authService.logout(refreshToken);
 
         return ResponseEntity.ok(
-                ApplicationResponse.<String>builder()
-                        .statusCode(200)
-                        .message(message)
-                        .payload(message)
-                        .build()
+                new ApplicationResponse<>(200, AppConstants.LOGOUT_SUCCESS, "Logged out successful")
         );
     }
 }
-
-
-
-
-

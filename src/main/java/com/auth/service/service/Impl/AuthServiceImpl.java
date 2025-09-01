@@ -1,189 +1,193 @@
 package com.auth.service.service.Impl;
-
-import com.auth.service.dto.*;
-import com.auth.service.entity.UserCredential;
-import com.auth.service.enums.LoginChannel;
-import com.auth.service.enums.Role;
+import com.auth.service.dto.CreatorSignupResponse;
+import com.auth.service.dto.CreatorSignupRequest;
+import com.auth.service.dto.FanSignupRequest;
+import com.auth.service.dto.FanSignupResponse;
+import com.auth.service.dto.LoginRequest;
+import com.auth.service.dto.JwtResponse;
+import com.auth.service.dto.TokenRefreshRequest;
+import com.auth.service.entity.Creator;
+import com.auth.service.entity.Fan;
 import com.auth.service.exception.CustomException;
 import com.auth.service.jwt.JwtUtil;
-import com.auth.service.repository.UserCredentialRepository;
+import com.auth.service.repository.CreatorRepository;
+import com.auth.service.repository.FanRepository;
 import com.auth.service.service.AuthService;
+import com.auth.service.util.AppConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-import java.util.UUID;
-
-import static com.auth.service.util.AppConstants.*;
+import java.time.LocalDate;
+import java.util.*;
 
 /**
- * Implementation of the AuthService interface.
- * <p>
- * Handles all core authentication logic including:
- * - User signup
- * - Login with email/password
- * - Refresh token generation
- * - OTP-less login (e.g., WhatsApp/SMS)
- * - Logout
+ * Service implementation for handling authentication-related operations.
+ * Supports registration and login for both Fans and Creators, as well as
+ * JWT token management (access/refresh).
  */
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    private final UserCredentialRepository userRepository;
-    private final JwtUtil jwtUtil;
+    private final FanRepository fanRepository;
+    private final CreatorRepository creatorRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
+    private final Map<String, String> refreshTokenStore = new HashMap<>();
 
     /**
-     * Registers a new user with the provided signup details.
-     * Ensures email uniqueness, validates role and login channel,
-     * and saves the user to the database.
-     *
-     * @param request the user signup request data
-     * @return a response message indicating successful registration
+     * Registers a new Fan in the system.
      */
     @Override
-    public SignupResponse signup(SignupRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new CustomException(USER_ALREADY_EXISTS);
+    public FanSignupResponse registerFan(FanSignupRequest request) {
+        if (fanRepository.findByEmail(request.getEmail()).isPresent()) {
+            return new FanSignupResponse(AppConstants.EMAIL_ALREADY_EXISTS, null, null);
+        }
+        if (fanRepository.findByUsername(request.getUsername()).isPresent()) {
+            return new FanSignupResponse(AppConstants.USERNAME_ALREADY_EXISTS, null, null);
+        }
+        if (fanRepository.findByPhone(request.getPhone()).isPresent()) {
+            return new FanSignupResponse(AppConstants.PHONE_ALREADY_EXISTS, null, null);
         }
 
-        Role roleEnum;
-        try {
-            roleEnum = Role.valueOf(request.getRole().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new CustomException("Invalid role: " + request.getRole());
-        }
+        String encodedPassword = request.getPassword() != null
+                ? passwordEncoder.encode(request.getPassword())
+                : null;
 
-        LoginChannel loginChannel;
-        try {
-            loginChannel = LoginChannel.valueOf(request.getLoginChannel().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new CustomException("Invalid login channel: " + request.getLoginChannel());
-        }
-
-        UserCredential user = UserCredential.builder()
+        Fan fan = Fan.builder()
                 .uuid(UUID.randomUUID().toString())
+                .fullName(request.getFullName())
+                .username(request.getUsername())
                 .email(request.getEmail())
                 .phone(request.getPhone())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(roleEnum)
-                .loginChannel(loginChannel)
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
+                .password(encodedPassword)
+                .bio(request.getBio())
+                .instagramLink(request.getInstagramLink())
+                .facebookLink(request.getFacebookLink())
+                .youtubeLink(request.getYoutubeLink())
+                .xUrl(request.getXUrl())
                 .build();
 
-        userRepository.save(user);
+        fanRepository.save(fan);
 
-        String message = switch (roleEnum) {
-            case CREATOR -> CREATOR_REGISTERED_SUCCESSFULLY;
-            case ADMIN -> ADMIN_REGISTERED_SUCCESSFULLY;
-            default -> USER_REGISTERED_SUCCESSFULLY;
-        };
-
-        return new SignupResponse(message);
+        return new FanSignupResponse(AppConstants.SIGNUP_SUCCESS, fan.getUuid(), fan.getUsername());
     }
 
     /**
-     * Authenticates a user using email and password.
-     * On success, returns a pair of JWT access and refresh tokens.
-     *
-     * @param request the login request containing email and password
-     * @return JWT tokens and user UUID
+     * Registers a new Creator in the system.
+     */
+    @Override
+    public CreatorSignupResponse registerCreator(CreatorSignupRequest request) {
+        if (creatorRepository.findByEmail(request.getEmail()).isPresent()) {
+            return new CreatorSignupResponse(null, null, null, AppConstants.EMAIL_ALREADY_EXISTS);
+        }
+        if (creatorRepository.findByUsername(request.getUsername()).isPresent()) {
+            return new CreatorSignupResponse(null, null, null, AppConstants.USERNAME_ALREADY_EXISTS);
+        }
+        if (creatorRepository.findByMobile(request.getMobile()).isPresent()) {
+            return new CreatorSignupResponse(null, null, null, AppConstants.MOBILE_ALREADY_EXISTS);
+        }
+
+        String encodedPassword = request.getPassword() != null
+                ? passwordEncoder.encode(request.getPassword())
+                : null;
+
+        Creator creator = Creator.builder()
+                .uuid(UUID.randomUUID().toString())
+                .fullName(request.getFullName())
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .mobile(request.getMobile())
+                .gender(request.getGender())
+                .dateOfBirth(request.getDateOfBirth() != null ? LocalDate.parse(request.getDateOfBirth()) : null)
+                .password(encodedPassword)
+                .bio(request.getBio())
+                .company(request.getCompany())
+                .country(request.getCountry())
+                .state(request.getState())
+                .city(request.getCity())
+                .postalCode(request.getPostalCode())
+                .billingAddress(request.getBillingAddress())
+                .instagramUrl(request.getInstagramUrl())
+                .facebookUrl(request.getFacebookUrl())
+                .youtubeUrl(request.getYoutubeUrl())
+                .twitterUrl(request.getTwitterUrl())
+                .build();
+
+        creatorRepository.save(creator);
+
+        return new CreatorSignupResponse(creator.getUuid(), creator.getUsername(),
+                creator.getFullName(), AppConstants.SIGNUP_SUCCESS);
+    }
+
+    /**
+     * Authenticates a user (Fan/Creator) and issues JWT tokens.
      */
     @Override
     public JwtResponse login(LoginRequest request) {
-        UserCredential user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new CustomException(INVALID_EMAIL_PASSWPRD));
+        Fan fan = fanRepository.findByEmail(request.getEmail()).orElse(null);
+        Creator creator = creatorRepository.findByEmail(request.getEmail()).orElse(null);
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new CustomException(INVALID_EMAIL_PASSWPRD);
+        if (fan == null && creator == null) {
+            throw new CustomException(AppConstants.USER_NOT_FOUND);
         }
 
-        String accessToken = jwtUtil.generateAccessToken(user);
-        String refreshToken = jwtUtil.generateRefreshToken(user);
+        String storedPassword;
+        String uuid;
+        String role;
 
-        return new JwtResponse(accessToken, refreshToken, user.getUuid());
+        if (fan != null) {
+            storedPassword = fan.getPassword();
+            uuid = fan.getUuid();
+            role = "FAN";
+        } else {
+            storedPassword = creator.getPassword();
+            uuid = creator.getUuid();
+            role = "CREATOR";
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), storedPassword)) {
+            throw new CustomException(AppConstants.INVALID_CREDENTIALS);
+        }
+
+        String accessToken = jwtUtil.generateAccessToken(uuid, request.getEmail(), role);
+        String refreshToken = jwtUtil.generateRefreshToken(uuid, request.getEmail(), role);
+
+        refreshTokenStore.put(refreshToken, uuid);
+
+        return new JwtResponse(accessToken, refreshToken, uuid, AppConstants.LOGIN_SUCCESS);
     }
 
     /**
-     * Refreshes the access token using a valid, non-expired refresh token.
-     *
-     * @param request contains the refresh token
-     * @return new access token along with the original refresh token and user UUID
+     * Issues new access/refresh tokens from a valid refresh token.
      */
     @Override
     public JwtResponse refreshToken(TokenRefreshRequest request) {
-        String uuid = jwtUtil.extractUuid(request.getRefreshToken());
+        String refreshToken = request.getRefreshToken();
 
-        if (!jwtUtil.isTokenExpired(request.getRefreshToken())) {
-            UserCredential user = userRepository.findByUuid(uuid)
-                    .orElseThrow(() -> new CustomException("User not found during refresh"));
-
-            String newAccessToken = jwtUtil.generateAccessToken(user);
-            return new JwtResponse(newAccessToken, request.getRefreshToken(), uuid);
-        } else {
-            throw new CustomException(REFERESH_TOKEN);
+        if (!jwtUtil.validateToken(refreshToken) || !refreshTokenStore.containsKey(refreshToken)) {
+            throw new CustomException(AppConstants.INVALID_REFRESH_TOKEN);
         }
+
+        String uuid = jwtUtil.extractUuid(refreshToken);
+        String email = jwtUtil.extractEmail(refreshToken);
+        String role = jwtUtil.extractRole(refreshToken);
+
+        String newAccessToken = jwtUtil.generateAccessToken(uuid, email, role);
+        String newRefreshToken = jwtUtil.generateRefreshToken(uuid, email, role);
+
+        refreshTokenStore.remove(refreshToken);
+        refreshTokenStore.put(newRefreshToken, uuid);
+
+        return new JwtResponse(newAccessToken, newRefreshToken, uuid, AppConstants.TOKEN_REFRESHED);
     }
 
     /**
-     * Registers or logs in a user using OTP-less authentication methods
-     * such as WhatsApp or SMS. If the user does not exist, a new user is created.
-     *
-     * @param otplessUser the user information from the OTP-less provider
-     * @return the authenticated or newly registered user
+     * Invalidates a refresh token (logout).
      */
     @Override
-    public UserCredential registerOrLoginWithOtpless(OtplessUser otplessUser) {
-        if (otplessUser.getPhone() == null || otplessUser.getChannel() == null) {
-            throw new CustomException("Invalid OTPLESS data: missing phone or channel.");
-        }
-
-        Optional<UserCredential> optional = userRepository.findByPhone(otplessUser.getPhone());
-
-        if (optional.isPresent()) {
-            return optional.get();
-        }
-
-        LoginChannel loginChannel;
-        try {
-            loginChannel = LoginChannel.valueOf(otplessUser.getChannel().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new CustomException("Invalid login channel: " + otplessUser.getChannel());
-        }
-
-        UserCredential user = UserCredential.builder()
-                .uuid(UUID.randomUUID().toString())
-                .email(otplessUser.getEmail())
-                .phone(otplessUser.getPhone())
-                .role(Role.USER)
-                .loginChannel(loginChannel)
-                .build();
-
-        userRepository.save(user);
-        return user;
-    }
-
-    /**
-     * Logs out a user by decoding their token and returning
-     * a role-specific logout message.
-     *
-     * @param token the JWT token to extract the user identity from
-     * @return a logout confirmation message
-     */
-    @Override
-    public String logout(String token) {
-        String uuid = jwtUtil.extractUuid(token);
-
-        UserCredential user = userRepository.findByUuid(uuid)
-                .orElseThrow(() -> new CustomException("User not found"));
-
-        return switch (user.getRole()) {
-            case CREATOR -> CREATOR_LOGGED_OUT_SUCCESSFULLY;
-            case ADMIN -> ADMIN_LOGGED_OUT_SUCCESSFULLY;
-            default -> USER_LOGGED_OUT_SUCCESSFULLY;
-        };
+    public void logout(String refreshToken) {
+        refreshTokenStore.remove(refreshToken);
     }
 }
