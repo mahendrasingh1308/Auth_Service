@@ -4,8 +4,9 @@ import com.auth.service.entity.Creator;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.UUID;
 
-public interface CreatorRepository extends JpaRepository<Creator, Long> {
+public interface  CreatorRepository extends JpaRepository<Creator, Long> {
     Optional<Creator> findByEmail(String email);
     Optional<Creator> findByUsername(String username);
     Optional<Creator> findByMobile(String mobile);

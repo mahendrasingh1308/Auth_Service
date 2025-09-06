@@ -43,7 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String jwt = authHeader.substring(7);
-        String userUuid = null;
+        String userEmail = null; // Changed from userUuid to userEmail
 
         try {
             if (!jwtUtil.validateToken(jwt)) {
@@ -52,10 +52,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            userUuid = jwtUtil.extractUuid(jwt);
+            // Extract EMAIL instead of UUID (since CustomUserDetailsService searches by email)
+            userEmail = jwtUtil.extractEmail(jwt);
 
-            if (userUuid != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(userUuid);
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                // Pass EMAIL to CustomUserDetailsService
+                UserDetails userDetails = customUserDetailsService.loadUserByUsername(userEmail);
 
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(

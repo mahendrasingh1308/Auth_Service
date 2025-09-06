@@ -1,11 +1,6 @@
 package com.auth.service.service.Impl;
-import com.auth.service.dto.CreatorSignupResponse;
-import com.auth.service.dto.CreatorSignupRequest;
-import com.auth.service.dto.FanSignupRequest;
-import com.auth.service.dto.FanSignupResponse;
-import com.auth.service.dto.LoginRequest;
-import com.auth.service.dto.JwtResponse;
-import com.auth.service.dto.TokenRefreshRequest;
+
+import com.auth.service.dto.*;
 import com.auth.service.entity.Creator;
 import com.auth.service.entity.Fan;
 import com.auth.service.exception.CustomException;
@@ -34,11 +29,15 @@ public class AuthServiceImpl implements AuthService {
     private final CreatorRepository creatorRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final Map<String, String> refreshTokenStore = new HashMap<>();
 
-    /**
-     * Registers a new Fan in the system.
-     */
+    private final Map<String, String> refreshTokenStore = new HashMap<>();
+    private final Set<String> blacklistedTokens = new HashSet<>();
+
+    @Override
+    public boolean isTokenBlacklisted(String token) {
+        return blacklistedTokens.contains(token);
+    }
+
     @Override
     public FanSignupResponse registerFan(FanSignupRequest request) {
         if (fanRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -74,9 +73,6 @@ public class AuthServiceImpl implements AuthService {
         return new FanSignupResponse(AppConstants.SIGNUP_SUCCESS, fan.getUuid(), fan.getUsername());
     }
 
-    /**
-     * Registers a new Creator in the system.
-     */
     @Override
     public CreatorSignupResponse registerCreator(CreatorSignupRequest request) {
         if (creatorRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -121,9 +117,6 @@ public class AuthServiceImpl implements AuthService {
                 creator.getFullName(), AppConstants.SIGNUP_SUCCESS);
     }
 
-    /**
-     * Authenticates a user (Fan/Creator) and issues JWT tokens.
-     */
     @Override
     public JwtResponse login(LoginRequest request) {
         Fan fan = fanRepository.findByEmail(request.getEmail()).orElse(null);
@@ -159,9 +152,6 @@ public class AuthServiceImpl implements AuthService {
         return new JwtResponse(accessToken, refreshToken, uuid, AppConstants.LOGIN_SUCCESS);
     }
 
-    /**
-     * Issues new access/refresh tokens from a valid refresh token.
-     */
     @Override
     public JwtResponse refreshToken(TokenRefreshRequest request) {
         String refreshToken = request.getRefreshToken();
@@ -183,11 +173,21 @@ public class AuthServiceImpl implements AuthService {
         return new JwtResponse(newAccessToken, newRefreshToken, uuid, AppConstants.TOKEN_REFRESHED);
     }
 
-    /**
-     * Invalidates a refresh token (logout).
-     */
     @Override
-    public void logout(String refreshToken) {
-        refreshTokenStore.remove(refreshToken);
+    public void logoutWithAccessToken(String accessToken) {
+        if (accessToken != null && jwtUtil.validateToken(accessToken)) {
+            blacklistedTokens.add(accessToken);
+
+            String userEmail = jwtUtil.extractEmail(accessToken);
+            refreshTokenStore.entrySet().removeIf(entry -> {
+                try {
+                    String tokenEmail = jwtUtil.extractEmail(entry.getKey());
+                    return userEmail.equals(tokenEmail);
+                } catch (Exception e) {
+                    return false;
+                }
+            });
+        }
     }
+
 }

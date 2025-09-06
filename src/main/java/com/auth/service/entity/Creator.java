@@ -59,4 +59,7 @@ public class Creator {
 
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    @Column(name = "role")
+    private String role;
 }
